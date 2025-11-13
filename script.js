@@ -5,9 +5,37 @@ const loadingSpinner = document.getElementById('loadingSpinner');
 const weatherDisplay = document.getElementById('weatherDisplay');
 const celsiusBtn = document.getElementById('celsiusBtn');
 const fahrenheitBtn = document.getElementById('fahrenheitBtn');
+const themeToggle = document.getElementById('themeToggle');
+const citySuggestions = document.getElementById('citySuggestions');
+const forecastBtn = document.getElementById('forecastBtn');
+const forecastDisplay = document.getElementById('forecastDisplay');
+const closeForecastBtn = document.getElementById('closeForecastBtn');
+const forecastCards = document.getElementById('forecastCards');
 
 let currentWeatherData = null;
 let isCelsius = true;
+let suggestionsTimeout = null;
+
+const popularCities = [
+    'London', 'New York', 'Tokyo', 'Paris', 'Dubai', 'Singapore', 
+    'Sydney', 'Mumbai', 'Barcelona', 'Istanbul', 'Los Angeles', 
+    'Chicago', 'Toronto', 'Berlin', 'Rome', 'Madrid', 'Amsterdam',
+    'Bangkok', 'Hong Kong', 'Seoul', 'San Francisco', 'Miami',
+    'Boston', 'Seattle', 'Las Vegas', 'Vancouver', 'Montreal'
+];
+
+function initTheme() {
+    const savedTheme = localStorage.getItem('weatherAppTheme');
+    if (savedTheme === 'dark') {
+        document.body.classList.add('dark-theme');
+    }
+}
+
+function toggleTheme() {
+    document.body.classList.toggle('dark-theme');
+    const isDark = document.body.classList.contains('dark-theme');
+    localStorage.setItem('weatherAppTheme', isDark ? 'dark' : 'light');
+}
 
 function showError(message) {
     errorMessage.textContent = message;
@@ -24,11 +52,50 @@ function hideError() {
 function showLoading() {
     loadingSpinner.classList.add('show');
     weatherDisplay.classList.remove('show');
+    forecastDisplay.classList.remove('show');
     hideError();
 }
 
 function hideLoading() {
     loadingSpinner.classList.remove('show');
+}
+
+function hideSuggestions() {
+    citySuggestions.classList.remove('show');
+    citySuggestions.innerHTML = '';
+}
+
+function showSuggestions(query) {
+    if (!query || query.length < 2) {
+        hideSuggestions();
+        return;
+    }
+
+    const filtered = popularCities.filter(city => 
+        city.toLowerCase().includes(query.toLowerCase())
+    ).slice(0, 5);
+
+    if (filtered.length === 0) {
+        hideSuggestions();
+        return;
+    }
+
+    citySuggestions.innerHTML = filtered.map(city => {
+        const regex = new RegExp(`(${query})`, 'gi');
+        const highlighted = city.replace(regex, '<strong>$1</strong>');
+        return `<div class="city-suggestion-item" data-city="${city}">${highlighted}</div>`;
+    }).join('');
+
+    citySuggestions.classList.add('show');
+
+    document.querySelectorAll('.city-suggestion-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const city = item.getAttribute('data-city');
+            cityInput.value = city;
+            hideSuggestions();
+            fetchWeather(city);
+        });
+    });
 }
 
 function updateTemperatureDisplay() {
@@ -65,6 +132,42 @@ function displayWeather(data) {
 
     hideLoading();
     weatherDisplay.classList.add('show');
+    forecastDisplay.classList.remove('show');
+}
+
+function displayForecast(data) {
+    forecastCards.innerHTML = '';
+
+    data.forecast.forEach((day, index) => {
+        const card = document.createElement('div');
+        card.className = 'forecast-card';
+        card.style.animationDelay = `${index * 0.1}s`;
+
+        const date = new Date(day.date);
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+        const tempHigh = isCelsius ? day.temperature.max_celsius : day.temperature.max_fahrenheit;
+        const tempLow = isCelsius ? day.temperature.min_celsius : day.temperature.min_fahrenheit;
+        const unit = isCelsius ? '°C' : '°F';
+
+        card.innerHTML = `
+            <div class="forecast-date">
+                <div class="forecast-day">${dayName}</div>
+                <div class="forecast-date-text">${dateStr}</div>
+            </div>
+            <img class="forecast-icon" src="https://openweathermap.org/img/wn/${day.icon}@2x.png" alt="${day.description}">
+            <div class="forecast-temp">
+                <div class="forecast-high">${tempHigh}${unit}</div>
+                <div class="forecast-low">${tempLow}${unit}</div>
+                <div class="forecast-desc">${day.description}</div>
+            </div>
+        `;
+
+        forecastCards.appendChild(card);
+    });
+
+    forecastDisplay.classList.add('show');
 }
 
 async function fetchWeather(city) {
@@ -90,26 +193,88 @@ async function fetchWeather(city) {
     }
 }
 
+async function fetchForecast(city) {
+    if (!city && !currentWeatherData) {
+        showError('Please search for a city first');
+        return;
+    }
+
+    const searchCity = city || currentWeatherData.city;
+    
+    try {
+        forecastBtn.disabled = true;
+        forecastBtn.textContent = 'Loading forecast...';
+
+        const response = await fetch(`/api/forecast?city=${encodeURIComponent(searchCity)}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to fetch forecast data');
+        }
+
+        displayForecast(data);
+    } catch (error) {
+        showError(error.message || 'Unable to fetch forecast data. Please try again.');
+    } finally {
+        forecastBtn.disabled = false;
+        forecastBtn.textContent = 'View 7-Day Forecast';
+    }
+}
+
 searchBtn.addEventListener('click', () => {
     const city = cityInput.value;
     fetchWeather(city);
+    hideSuggestions();
 });
 
 cityInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         const city = cityInput.value;
         fetchWeather(city);
+        hideSuggestions();
+    }
+});
+
+cityInput.addEventListener('input', (e) => {
+    clearTimeout(suggestionsTimeout);
+    suggestionsTimeout = setTimeout(() => {
+        showSuggestions(e.target.value);
+    }, 300);
+});
+
+document.addEventListener('click', (e) => {
+    if (!citySuggestions.contains(e.target) && e.target !== cityInput) {
+        hideSuggestions();
     }
 });
 
 celsiusBtn.addEventListener('click', () => {
     isCelsius = true;
     updateTemperatureDisplay();
+    if (forecastDisplay.classList.contains('show') && currentWeatherData) {
+        fetchForecast(currentWeatherData.city);
+    }
 });
 
 fahrenheitBtn.addEventListener('click', () => {
     isCelsius = false;
     updateTemperatureDisplay();
+    if (forecastDisplay.classList.contains('show') && currentWeatherData) {
+        fetchForecast(currentWeatherData.city);
+    }
 });
 
+themeToggle.addEventListener('click', toggleTheme);
+
+forecastBtn.addEventListener('click', () => {
+    if (currentWeatherData) {
+        fetchForecast(currentWeatherData.city);
+    }
+});
+
+closeForecastBtn.addEventListener('click', () => {
+    forecastDisplay.classList.remove('show');
+});
+
+initTheme();
 fetchWeather('London');
