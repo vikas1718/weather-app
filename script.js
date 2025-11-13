@@ -56,7 +56,7 @@ function displayWeather(data) {
     document.getElementById('cityName').textContent = data.city;
     document.getElementById('country').textContent = data.country;
     document.getElementById('weatherDescription').textContent = data.description;
-    document.getElementById('weatherIcon').src = `http://openweathermap.org/img/wn/${data.icon}@4x.png`;
+    document.getElementById('weatherIcon').src = `https://openweathermap.org/img/wn/${data.icon}@4x.png`;
     document.getElementById('humidity').textContent = `${data.humidity}%`;
     document.getElementById('windSpeed').textContent = `${data.wind_speed} m/s`;
     document.getElementById('pressure').textContent = `${data.pressure} hPa`;
