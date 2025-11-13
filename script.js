@@ -8,9 +8,12 @@ const fahrenheitBtn = document.getElementById('fahrenheitBtn');
 const themeToggle = document.getElementById('themeToggle');
 const citySuggestions = document.getElementById('citySuggestions');
 const forecastBtn = document.getElementById('forecastBtn');
-const forecastDisplay = document.getElementById('forecastDisplay');
-const closeForecastBtn = document.getElementById('closeForecastBtn');
-const forecastCards = document.getElementById('forecastCards');
+const currentWeatherView = document.getElementById('currentWeatherView');
+const forecastView = document.getElementById('forecastView');
+const backBtn = document.getElementById('backBtn');
+const forecastCardsContainer = document.getElementById('forecastCardsContainer');
+const forecastLoadingSpinner = document.getElementById('forecastLoadingSpinner');
+const forecastCityName = document.getElementById('forecastCityName');
 
 let currentWeatherData = null;
 let isCelsius = true;
@@ -37,6 +40,26 @@ function toggleTheme() {
     localStorage.setItem('weatherAppTheme', isDark ? 'dark' : 'light');
 }
 
+function showCurrentWeatherView() {
+    currentWeatherView.classList.remove('hide');
+    currentWeatherView.classList.add('show');
+    forecastView.classList.remove('show');
+    forecastView.classList.add('hide');
+    setTimeout(() => {
+        forecastView.style.display = 'none';
+        currentWeatherView.style.display = 'block';
+    }, 100);
+}
+
+function showForecastView() {
+    forecastView.style.display = 'block';
+    currentWeatherView.style.display = 'none';
+    currentWeatherView.classList.remove('show');
+    currentWeatherView.classList.add('hide');
+    forecastView.classList.remove('hide');
+    forecastView.classList.add('show');
+}
+
 function showError(message) {
     errorMessage.textContent = message;
     errorMessage.classList.add('show');
@@ -52,7 +75,6 @@ function hideError() {
 function showLoading() {
     loadingSpinner.classList.add('show');
     weatherDisplay.classList.remove('show');
-    forecastDisplay.classList.remove('show');
     hideError();
 }
 
@@ -132,11 +154,11 @@ function displayWeather(data) {
 
     hideLoading();
     weatherDisplay.classList.add('show');
-    forecastDisplay.classList.remove('show');
 }
 
 function displayForecast(data) {
-    forecastCards.innerHTML = '';
+    forecastCardsContainer.innerHTML = '';
+    forecastCityName.textContent = `7-Day Forecast - ${data.city}`;
 
     data.forecast.forEach((day, index) => {
         const card = document.createElement('div');
@@ -152,22 +174,18 @@ function displayForecast(data) {
         const unit = isCelsius ? '°C' : '°F';
 
         card.innerHTML = `
-            <div class="forecast-date">
-                <div class="forecast-day">${dayName}</div>
-                <div class="forecast-date-text">${dateStr}</div>
-            </div>
+            <div class="forecast-day">${dayName}</div>
+            <div class="forecast-date-text">${dateStr}</div>
             <img class="forecast-icon" src="https://openweathermap.org/img/wn/${day.icon}@2x.png" alt="${day.description}">
-            <div class="forecast-temp">
-                <div class="forecast-high">${tempHigh}${unit}</div>
-                <div class="forecast-low">${tempLow}${unit}</div>
-                <div class="forecast-desc">${day.description}</div>
-            </div>
+            <div class="forecast-high">${tempHigh}${unit}</div>
+            <div class="forecast-low">${tempLow}${unit}</div>
+            <div class="forecast-desc">${day.description}</div>
         `;
 
-        forecastCards.appendChild(card);
+        forecastCardsContainer.appendChild(card);
     });
 
-    forecastDisplay.classList.add('show');
+    forecastLoadingSpinner.classList.remove('show');
 }
 
 async function fetchWeather(city) {
@@ -201,10 +219,10 @@ async function fetchForecast(city) {
 
     const searchCity = city || currentWeatherData.city;
     
-    try {
-        forecastBtn.disabled = true;
-        forecastBtn.textContent = 'Loading forecast...';
+    showForecastView();
+    forecastLoadingSpinner.classList.add('show');
 
+    try {
         const response = await fetch(`/api/forecast?city=${encodeURIComponent(searchCity)}`);
         const data = await response.json();
 
@@ -214,10 +232,9 @@ async function fetchForecast(city) {
 
         displayForecast(data);
     } catch (error) {
+        forecastLoadingSpinner.classList.remove('show');
         showError(error.message || 'Unable to fetch forecast data. Please try again.');
-    } finally {
-        forecastBtn.disabled = false;
-        forecastBtn.textContent = 'View 7-Day Forecast';
+        showCurrentWeatherView();
     }
 }
 
@@ -251,7 +268,7 @@ document.addEventListener('click', (e) => {
 celsiusBtn.addEventListener('click', () => {
     isCelsius = true;
     updateTemperatureDisplay();
-    if (forecastDisplay.classList.contains('show') && currentWeatherData) {
+    if (forecastView.classList.contains('show') && currentWeatherData) {
         fetchForecast(currentWeatherData.city);
     }
 });
@@ -259,7 +276,7 @@ celsiusBtn.addEventListener('click', () => {
 fahrenheitBtn.addEventListener('click', () => {
     isCelsius = false;
     updateTemperatureDisplay();
-    if (forecastDisplay.classList.contains('show') && currentWeatherData) {
+    if (forecastView.classList.contains('show') && currentWeatherData) {
         fetchForecast(currentWeatherData.city);
     }
 });
@@ -272,8 +289,8 @@ forecastBtn.addEventListener('click', () => {
     }
 });
 
-closeForecastBtn.addEventListener('click', () => {
-    forecastDisplay.classList.remove('show');
+backBtn.addEventListener('click', () => {
+    showCurrentWeatherView();
 });
 
 initTheme();

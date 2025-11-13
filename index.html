@@ -25,7 +25,8 @@
     </button>
 
     <div class="container">
-        <div class="weather-card">
+        <!-- Current Weather View -->
+        <div id="currentWeatherView" class="weather-card">
             <h1 class="app-title">Weather App</h1>
             
             <div class="search-container">
@@ -127,21 +128,36 @@
                     </div>
                 </div>
 
-                <button id="forecastBtn" class="forecast-btn">View 7-Day Forecast</button>
+                <button id="forecastBtn" class="forecast-btn">View 7-Day Forecast →</button>
+            </div>
+        </div>
+
+        <!-- 7-Day Forecast View -->
+        <div id="forecastView" class="forecast-view">
+            <div class="forecast-view-header">
+                <button id="backBtn" class="back-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Back
+                </button>
+                <h2 id="forecastCityName">7-Day Forecast</h2>
             </div>
 
-            <div id="forecastDisplay" class="forecast-display">
-                <div class="forecast-header">
-                    <h2>7-Day Forecast</h2>
-                    <button id="closeForecastBtn" class="close-forecast-btn">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                    </button>
+            <div id="forecastLoadingSpinner" class="loading-spinner">
+                <div class="spinner-container">
+                    <div class="spinner-ring"></div>
+                    <div class="spinner-ring"></div>
+                    <div class="spinner-ring"></div>
+                    <svg class="spinner-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 15v4c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-4M17 9l-5 5-5-5M12 12.8V2.5"/>
+                    </svg>
                 </div>
-                <div id="forecastCards" class="forecast-cards"></div>
+                <p>Loading forecast data...</p>
             </div>
+
+            <div id="forecastCardsContainer" class="forecast-cards-container"></div>
         </div>
     </div>
 
