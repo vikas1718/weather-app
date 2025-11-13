@@ -15,6 +15,14 @@ OPENWEATHER_API_KEY = os.getenv('OPENWEATHER_API_KEY')
 def index():
     return app.send_static_file('index.html')
 
+@app.route('/style.css')
+def styles():
+    return app.send_static_file('style.css')
+
+@app.route('/script.js')
+def scripts():
+    return app.send_static_file('script.js')
+
 @app.route('/api/weather', methods=['GET'])
 def get_weather():
     city = request.args.get('city')
