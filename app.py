@@ -23,6 +23,8 @@ def styles():
 def scripts():
     return app.send_static_file('script.js')
 
+
+
 @app.route('/api/weather', methods=['GET'])
 def get_weather():
     city = request.args.get('city')
@@ -72,51 +74,109 @@ def get_weather():
     except Exception as e:
         return jsonify({'error': 'Internal server error'}), 500
 
-@app.route('/api/forecast', methods=['GET'])
-def get_forecast():
+@app.route('/api/hourly', methods=['GET'])
+def get_hourly():
     city = request.args.get('city')
-    
+
     if not city:
         return jsonify({'error': 'City name is required'}), 400
-    
+
     if not OPENWEATHER_API_KEY:
         return jsonify({'error': 'API key not configured'}), 500
-    
+
     try:
         url = f'http://api.openweathermap.org/data/2.5/forecast?q={city}&appid={OPENWEATHER_API_KEY}&units=metric&cnt=40'
         response = requests.get(url, timeout=10)
-        
+
         if response.status_code == 404:
             return jsonify({'error': 'City not found'}), 404
-        
+
+        if response.status_code != 200:
+            return jsonify({'error': 'Failed to fetch hourly data'}), response.status_code
+
+        data = response.json()
+
+        hourly_list = []
+        for item in data['list'][:4]:  # Next 12 hours (4 * 3-hour intervals)
+            dt = item['dt']
+            dt_txt = item['dt_txt']
+
+            hourly_list.append({
+                'datetime': dt_txt,
+                'timestamp': dt,
+                'temperature': {
+                    'celsius': round(item['main']['temp'], 1),
+                    'fahrenheit': round((item['main']['temp'] * 9/5) + 32, 1)
+                },
+                'feels_like': {
+                    'celsius': round(item['main']['feels_like'], 1),
+                    'fahrenheit': round((item['main']['feels_like'] * 9/5) + 32, 1)
+                },
+                'humidity': item['main']['humidity'],
+                'description': item['weather'][0]['description'].title(),
+                'icon': item['weather'][0]['icon'],
+                'wind_speed': item['wind']['speed'],
+                'precipitation': item.get('rain', {}).get('3h', 0) + item.get('snow', {}).get('3h', 0)
+            })
+
+        return jsonify({
+            'city': data['city']['name'],
+            'country': data['city']['country'],
+            'hourly': hourly_list
+        }), 200
+
+    except requests.exceptions.Timeout:
+        return jsonify({'error': 'Request timeout'}), 504
+    except requests.exceptions.RequestException as e:
+        return jsonify({'error': 'Failed to connect to weather service'}), 503
+    except Exception as e:
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/forecast', methods=['GET'])
+def get_forecast():
+    city = request.args.get('city')
+
+    if not city:
+        return jsonify({'error': 'City name is required'}), 400
+
+    if not OPENWEATHER_API_KEY:
+        return jsonify({'error': 'API key not configured'}), 500
+
+    try:
+        url = f'http://api.openweathermap.org/data/2.5/forecast?q={city}&appid={OPENWEATHER_API_KEY}&units=metric&cnt=40'
+        response = requests.get(url, timeout=10)
+
+        if response.status_code == 404:
+            return jsonify({'error': 'City not found'}), 404
+
         if response.status_code != 200:
             return jsonify({'error': 'Failed to fetch forecast data'}), response.status_code
-        
+
         data = response.json()
-        
+
         daily_forecasts = {}
         for item in data['list']:
             date = item['dt_txt'].split(' ')[0]
-            
+
             if date not in daily_forecasts:
                 daily_forecasts[date] = {
                     'temps': [],
                     'descriptions': [],
                     'icons': []
                 }
-            
+
             daily_forecasts[date]['temps'].append(item['main']['temp'])
             daily_forecasts[date]['descriptions'].append(item['weather'][0]['description'])
             daily_forecasts[date]['icons'].append(item['weather'][0]['icon'])
-        
+
         forecast_list = []
-        for date, values in sorted(daily_forecasts.items())[:7]:
+        for date, values in sorted(daily_forecasts.items())[:5]:
             max_temp = max(values['temps'])
             min_temp = min(values['temps'])
-            
+
             most_common_desc = max(set(values['descriptions']), key=values['descriptions'].count)
             most_common_icon = max(set(values['icons']), key=values['icons'].count)
-            
+
             forecast_list.append({
                 'date': date,
                 'temperature': {
@@ -128,17 +188,55 @@ def get_forecast():
                 'description': most_common_desc.title(),
                 'icon': most_common_icon
             })
-        
+
         return jsonify({
             'city': data['city']['name'],
             'country': data['city']['country'],
             'forecast': forecast_list
         }), 200
-        
+
     except requests.exceptions.Timeout:
         return jsonify({'error': 'Request timeout'}), 504
     except requests.exceptions.RequestException as e:
         return jsonify({'error': 'Failed to connect to weather service'}), 503
+    except Exception as e:
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/city-suggestions', methods=['GET'])
+def get_city_suggestions():
+    query = request.args.get('q')
+
+    if not query:
+        return jsonify({'error': 'Query parameter is required'}), 400
+
+    if not OPENWEATHER_API_KEY:
+        return jsonify({'error': 'API key not configured'}), 500
+
+    try:
+        url = f'http://api.openweathermap.org/geo/1.0/direct?q={query}&limit=5&appid={OPENWEATHER_API_KEY}'
+        response = requests.get(url, timeout=10)
+
+        if response.status_code != 200:
+            return jsonify({'error': 'Failed to fetch city suggestions'}), response.status_code
+
+        data = response.json()
+
+        suggestions = []
+        for item in data:
+            suggestion = {
+                'name': item['name'],
+                'country': item['country']
+            }
+            if 'state' in item:
+                suggestion['state'] = item['state']
+            suggestions.append(suggestion)
+
+        return jsonify({'suggestions': suggestions}), 200
+
+    except requests.exceptions.Timeout:
+        return jsonify({'error': 'Request timeout'}), 504
+    except requests.exceptions.RequestException as e:
+        return jsonify({'error': 'Failed to connect to geocoding service'}), 503
     except Exception as e:
         return jsonify({'error': 'Internal server error'}), 500
 
